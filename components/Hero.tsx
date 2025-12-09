@@ -1,0 +1,1 @@
+export default function Hero(){return(<div className='h-[90vh] flex items-center justify-center'><h1 className='text-6xl font-bold'>FolseTec Pro AI Studio</h1></div>)}

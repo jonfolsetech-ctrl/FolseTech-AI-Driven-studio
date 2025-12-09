@@ -1,0 +1,1 @@
+export default function Waveform(){return(<div>Waveform Visualizer</div>)}
