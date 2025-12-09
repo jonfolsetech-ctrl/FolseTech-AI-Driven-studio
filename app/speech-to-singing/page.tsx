@@ -18,6 +18,7 @@ export default function SpeechToSingingPage() {
   const [key, setKey] = useState('C Major')
   const [style, setStyle] = useState('Pop')
   const [autoTune, setAutoTune] = useState(50)
+  const [lyrics, setLyrics] = useState('')
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const audioChunksRef = useRef<Blob[]>([])
 
@@ -92,6 +93,7 @@ export default function SpeechToSingingPage() {
       formData.append('key', key)
       formData.append('style', style)
       formData.append('autoTune', autoTune.toString())
+      formData.append('lyrics', lyrics)
 
       console.log('Sending conversion request...')
 
@@ -246,6 +248,28 @@ export default function SpeechToSingingPage() {
                     onChange={(e) => setAutoTune(parseInt(e.target.value))}
                     className="w-full accent-purple-600" 
                   />
+                </div>
+              </div>
+            </div>
+
+            <div className="card">
+              <h2 className="text-xl font-bold mb-4">Lyrics</h2>
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm mb-2 text-gray-300">
+                    Paste Your Lyrics
+                    <span className="text-xs text-gray-500 ml-2">(optional)</span>
+                  </label>
+                  <textarea
+                    value={lyrics}
+                    onChange={(e) => setLyrics(e.target.value)}
+                    placeholder="Paste or type your lyrics here...&#10;&#10;This helps guide the singing conversion"
+                    className="input-field min-h-[150px] resize-y font-mono text-sm"
+                    rows={6}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {lyrics.length} characters • {lyrics.split(/\s+/).filter(Boolean).length} words
+                  </p>
                 </div>
               </div>
             </div>

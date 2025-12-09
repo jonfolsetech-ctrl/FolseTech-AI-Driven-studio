@@ -8,6 +8,7 @@ export default function BeatGeneratorPage() {
   const [genre, setGenre] = useState('hip-hop')
   const [bpm, setBpm] = useState(120)
   const [mood, setMood] = useState('energetic')
+  const [stylePrompt, setStylePrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasGenerated, setHasGenerated] = useState(false)
 
@@ -82,6 +83,23 @@ export default function BeatGeneratorPage() {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-300">
+                    Style Description
+                    <span className="text-xs text-gray-500 ml-2">(optional)</span>
+                  </label>
+                  <textarea
+                    value={stylePrompt}
+                    onChange={(e) => setStylePrompt(e.target.value)}
+                    placeholder="Paste or describe your desired style... e.g., 'dark trap with heavy 808s and ethereal synths'"
+                    className="input-field min-h-[100px] resize-y"
+                    rows={4}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Add specific style instructions for more customized beats
+                  </p>
+                </div>
+
                 <button 
                   onClick={handleGenerate}
                   disabled={isGenerating}
@@ -110,6 +128,12 @@ export default function BeatGeneratorPage() {
                       <div>
                         <h3 className="text-xl font-semibold">Beat_001.wav</h3>
                         <p className="text-sm text-gray-400">{genre} • {bpm} BPM • {mood}</p>
+                        {stylePrompt && (
+                          <p className="text-xs text-purple-400 mt-1">
+                            Custom style: {stylePrompt.substring(0, 60)}
+                            {stylePrompt.length > 60 ? '...' : ''}
+                          </p>
+                        )}
                       </div>
                       <button className="btn-secondary text-sm">Download</button>
                     </div>

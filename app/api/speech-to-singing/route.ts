@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
     const key = formData.get('key') as string
     const style = formData.get('style') as string
     const autoTune = formData.get('autoTune') as string
+    const lyrics = formData.get('lyrics') as string
 
     if (!audioFile) {
       return NextResponse.json(
@@ -23,6 +24,8 @@ export async function POST(req: NextRequest) {
       key,
       style,
       autoTune,
+      lyrics: lyrics ? `${lyrics.substring(0, 50)}...` : 'none',
+      lyricsLength: lyrics?.length || 0,
       fileSize: audioFile.size,
       fileType: audioFile.type
     })
@@ -34,11 +37,14 @@ export async function POST(req: NextRequest) {
     const audioBuffer = await audioFile.arrayBuffer()
     
     /* 
-     * TO ADD REAL AI SPEECH-TO-SINGING CONVERSION:
+     * TO ADD REAL AI SPEECH-TO-SINGING CONVERSION WITH LYRICS:
+     * 
+     * The lyrics parameter helps guide the AI to sing the specific words.
+     * Your voice recording provides the voice characteristics.
      * 
      * Option 1: Replicate API (https://replicate.com)
      * - Sign up and get API token
-     * - Use models like: "so-vits-svc" or similar singing voice conversion models
+     * - Use models like: "so-vits-svc" or "bark" for singing voice conversion
      * - Example:
      *   const response = await fetch('https://api.replicate.com/v1/predictions', {
      *     method: 'POST',
@@ -48,23 +54,32 @@ export async function POST(req: NextRequest) {
      *     },
      *     body: JSON.stringify({
      *       version: "model-version-here",
-     *       input: { audio: base64Audio, pitch_shift: pitchShift }
+     *       input: { 
+     *         audio: base64Audio, 
+     *         pitch_shift: pitchShift,
+     *         lyrics: lyrics,  // Use lyrics to guide singing
+     *         style: style,
+     *         key: key
+     *       }
      *     })
      *   })
      * 
-     * Option 2: OpenAI API (when available)
-     * - Use their audio processing capabilities
+     * Option 2: Suno AI or similar text-to-music services
+     * - Combine your voice characteristics with lyrics
+     * - Generate singing based on voice sample + lyrics
      * 
      * Option 3: Custom Model
-     * - Host your own SoVITS, RVC, or similar model
-     * - Send audio to your model endpoint
+     * - Host your own SoVITS, RVC, or Diff-SVC model
+     * - Process: Extract voice features → Apply to lyrics → Generate singing
      * 
-     * Option 4: ElevenLabs or similar voice AI services
-     * - Use their voice transformation APIs
+     * Option 4: ElevenLabs Voice Design
+     * - Clone voice from sample
+     * - Generate speech with singing intonation
      * 
      * Add your API key to .env.local:
      * REPLICATE_API_TOKEN=your_token_here
      * ELEVENLABS_API_KEY=your_key_here
+     * SUNO_API_KEY=your_key_here
      */
     
     // For now, return the original audio as a placeholder
