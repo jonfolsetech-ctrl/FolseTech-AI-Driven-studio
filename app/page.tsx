@@ -65,12 +65,15 @@ export default function Home() {
                 </div>
               </div>
 
-              <button
+              <a
+                href="https://main.d1nacdggybplre.amplifyapp.com/"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={handleCloseAnnouncement}
-                className="btn-primary w-full"
+                className="btn-primary w-full block text-center"
               >
                 Get Started 🚀
-              </button>
+              </a>
               
               <p className="text-xs text-gray-500 mt-4">
                 This is a beta platform. AI integration coming soon!
