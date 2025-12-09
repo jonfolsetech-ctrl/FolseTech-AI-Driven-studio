@@ -1,1 +1,134 @@
-<h1>Beat Generator Tool UI</h1>
+'use client'
+import { useState } from 'react'
+import Link from 'next/link'
+import AudioPlayer from '@/components/audio/AudioPlayer'
+import Waveform from '@/components/audio/Waveform'
+
+export default function BeatGeneratorPage() {
+  const [genre, setGenre] = useState('hip-hop')
+  const [bpm, setBpm] = useState(120)
+  const [mood, setMood] = useState('energetic')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [hasGenerated, setHasGenerated] = useState(false)
+
+  const handleGenerate = async () => {
+    setIsGenerating(true)
+    // Simulate API call
+    setTimeout(() => {
+      setIsGenerating(false)
+      setHasGenerated(true)
+    }, 2000)
+  }
+
+  return (
+    <div className="min-h-screen bg-black">
+      <div className="container mx-auto p-8">
+        <div className="flex justify-between items-center mb-8">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-blue-400 text-transparent bg-clip-text">
+            AI Beat Generator
+          </h1>
+          <Link href="/dashboard" className="btn-secondary">Back to Dashboard</Link>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Controls */}
+          <div className="lg:col-span-1">
+            <div className="card">
+              <h2 className="text-2xl font-bold mb-6">Settings</h2>
+              
+              <div className="space-y-6">
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-300">Genre</label>
+                  <select 
+                    value={genre} 
+                    onChange={(e) => setGenre(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="hip-hop">Hip Hop</option>
+                    <option value="trap">Trap</option>
+                    <option value="edm">EDM</option>
+                    <option value="pop">Pop</option>
+                    <option value="rock">Rock</option>
+                    <option value="jazz">Jazz</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-300">
+                    BPM: <span className="text-purple-400">{bpm}</span>
+                  </label>
+                  <input 
+                    type="range" 
+                    min="60" 
+                    max="200" 
+                    value={bpm}
+                    onChange={(e) => setBpm(parseInt(e.target.value))}
+                    className="w-full h-2 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-purple-600"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-2 text-gray-300">Mood</label>
+                  <select 
+                    value={mood} 
+                    onChange={(e) => setMood(e.target.value)}
+                    className="input-field"
+                  >
+                    <option value="energetic">Energetic</option>
+                    <option value="chill">Chill</option>
+                    <option value="dark">Dark</option>
+                    <option value="uplifting">Uplifting</option>
+                    <option value="aggressive">Aggressive</option>
+                  </select>
+                </div>
+
+                <button 
+                  onClick={handleGenerate}
+                  disabled={isGenerating}
+                  className="btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGenerating ? '🎵 Generating...' : '✨ Generate Beat'}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Output */}
+          <div className="lg:col-span-2">
+            <div className="card">
+              <h2 className="text-2xl font-bold mb-6">Generated Beat</h2>
+              
+              {!hasGenerated ? (
+                <div className="flex flex-col items-center justify-center py-20 text-center">
+                  <div className="text-6xl mb-4">🎵</div>
+                  <p className="text-gray-400 text-lg">Configure your settings and click Generate Beat to create your AI-powered music</p>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  <div className="bg-gray-800/50 rounded-lg p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <h3 className="text-xl font-semibold">Beat_001.wav</h3>
+                        <p className="text-sm text-gray-400">{genre} • {bpm} BPM • {mood}</p>
+                      </div>
+                      <button className="btn-secondary text-sm">Download</button>
+                    </div>
+                    <Waveform />
+                    <div className="mt-4">
+                      <AudioPlayer />
+                    </div>
+                  </div>
+
+                  <div className="flex gap-4">
+                    <button className="btn-primary flex-1">Save to Library</button>
+                    <button onClick={handleGenerate} className="btn-secondary flex-1">Generate Another</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

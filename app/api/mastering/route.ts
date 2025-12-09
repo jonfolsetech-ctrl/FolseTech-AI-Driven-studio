@@ -1,1 +1,5 @@
-export async function POST(req){return new Response('OK')}
+import { NextRequest } from 'next/server'
+
+export async function POST(req: NextRequest) {
+  return new Response('OK', { status: 200 })
+}
