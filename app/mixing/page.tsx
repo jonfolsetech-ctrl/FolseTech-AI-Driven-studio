@@ -5,23 +5,92 @@ import AudioPlayer from '@/components/audio/AudioPlayer'
 import Waveform from '@/components/audio/Waveform'
 
 export default function MixingPage() {
-  const [uploadedFile, setUploadedFile] = useState<string | null>(null)
+  const [vocalFile, setVocalFile] = useState<File | null>(null)
+  const [vocalUrl, setVocalUrl] = useState<string | null>(null)
+  const [instrumentalFile, setInstrumentalFile] = useState<File | null>(null)
+  const [instrumentalUrl, setInstrumentalUrl] = useState<string | null>(null)
   const [isMixing, setIsMixing] = useState(false)
   const [hasMixed, setHasMixed] = useState(false)
+  const [mixedAudioUrl, setMixedAudioUrl] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVocalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      setUploadedFile(file.name)
+      const url = URL.createObjectURL(file)
+      setVocalFile(file)
+      setVocalUrl(url)
+    }
+  }
+
+  const handleInstrumentalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setInstrumentalFile(file)
+      setInstrumentalUrl(url)
     }
   }
 
   const handleMix = async () => {
+    if (!vocalFile || !instrumentalFile) {
+      setError('Please upload both vocal and instrumental tracks')
+      return
+    }
+
     setIsMixing(true)
-    setTimeout(() => {
-      setIsMixing(false)
+    setError(null)
+
+    try {
+      const formData = new FormData()
+      formData.append('vocals', vocalFile)
+      formData.append('instrumental', instrumentalFile)
+
+      const response = await fetch('/api/mixing', {
+        method: 'POST',
+        body: formData,
+      })
+
+      if (!response.ok) {
+        throw new Error('Mixing failed')
+      }
+
+      const resultBlob = await response.blob()
+      const audioUrl = URL.createObjectURL(resultBlob)
+      
+      setMixedAudioUrl(audioUrl)
       setHasMixed(true)
-    }, 3000)
+    } catch (err) {
+      setError('Mixing failed. Please try again.')
+      console.error('Mixing error:', err)
+    } finally {
+      setIsMixing(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!mixedAudioUrl) return
+    
+    const link = document.createElement('a')
+    link.href = mixedAudioUrl
+    link.download = `mixed-song-${Date.now()}.mp3`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleReset = () => {
+    if (vocalUrl) URL.revokeObjectURL(vocalUrl)
+    if (instrumentalUrl) URL.revokeObjectURL(instrumentalUrl)
+    if (mixedAudioUrl) URL.revokeObjectURL(mixedAudioUrl)
+    
+    setVocalFile(null)
+    setVocalUrl(null)
+    setInstrumentalFile(null)
+    setInstrumentalUrl(null)
+    setMixedAudioUrl(null)
+    setHasMixed(false)
+    setError(null)
   }
 
   return (
@@ -37,24 +106,54 @@ export default function MixingPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Upload Section */}
           <div className="lg:col-span-1">
+            {/* Vocal Upload */}
             <div className="card">
-              <h2 className="text-xl font-bold mb-4">Upload Track</h2>
-              <div className="border-2 border-dashed border-gray-700 rounded-lg p-8 text-center hover:border-purple-600 transition-colors">
+              <h2 className="text-xl font-bold mb-4">🎤 Vocals</h2>
+              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-purple-600 transition-colors">
                 <input 
                   type="file" 
                   accept="audio/*" 
-                  onChange={handleFileUpload}
+                  onChange={handleVocalUpload}
                   className="hidden" 
-                  id="file-upload"
+                  id="vocal-upload"
                 />
-                <label htmlFor="file-upload" className="cursor-pointer">
-                  <div className="text-4xl mb-2">📁</div>
-                  <p className="text-sm text-gray-400">Click to upload audio file</p>
+                <label htmlFor="vocal-upload" className="cursor-pointer">
+                  <div className="text-4xl mb-2">🎙️</div>
+                  <p className="text-sm text-gray-400">Upload vocals</p>
                 </label>
               </div>
-              {uploadedFile && (
-                <div className="mt-4 p-3 bg-gray-800 rounded-lg">
-                  <p className="text-sm truncate">✓ {uploadedFile}</p>
+              {vocalFile && (
+                <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+                  <p className="text-sm truncate">✓ {vocalFile.name}</p>
+                  <div className="mt-2">
+                    <AudioPlayer src={vocalUrl || undefined} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Instrumental Upload */}
+            <div className="card mt-6">
+              <h2 className="text-xl font-bold mb-4">🎵 Instrumental</h2>
+              <div className="border-2 border-dashed border-gray-700 rounded-lg p-6 text-center hover:border-purple-600 transition-colors">
+                <input 
+                  type="file" 
+                  accept="audio/*" 
+                  onChange={handleInstrumentalUpload}
+                  className="hidden" 
+                  id="instrumental-upload"
+                />
+                <label htmlFor="instrumental-upload" className="cursor-pointer">
+                  <div className="text-4xl mb-2">🎹</div>
+                  <p className="text-sm text-gray-400">Upload instrumental</p>
+                </label>
+              </div>
+              {instrumentalFile && (
+                <div className="mt-3 p-3 bg-gray-800 rounded-lg">
+                  <p className="text-sm truncate">✓ {instrumentalFile.name}</p>
+                  <div className="mt-2">
+                    <AudioPlayer src={instrumentalUrl || undefined} />
+                  </div>
                 </div>
               )}
             </div>
@@ -92,27 +191,47 @@ export default function MixingPage() {
             <div className="card">
               <h2 className="text-2xl font-bold mb-6">Mixing Console</h2>
               
-              {!uploadedFile ? (
+              {error && (
+                <div className="bg-red-500/20 border border-red-500 rounded-lg p-4 text-red-400 mb-6">
+                  {error}
+                </div>
+              )}
+              
+              {!vocalFile && !instrumentalFile ? (
                 <div className="flex flex-col items-center justify-center py-20">
                   <div className="text-6xl mb-4">🎚️</div>
-                  <p className="text-gray-400 text-lg">Upload an audio file to start mixing</p>
+                  <p className="text-gray-400 text-lg mb-2">Upload vocals and instrumental to start mixing</p>
+                  <p className="text-gray-500 text-sm">Create a full song by combining your tracks</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Original Track */}
-                  <div className="bg-gray-800/50 rounded-lg p-6">
-                    <h3 className="font-semibold mb-3">Original Track</h3>
-                    <Waveform />
-                    <div className="mt-4">
-                      <AudioPlayer />
+                  {/* Vocal Track */}
+                  {vocalFile && (
+                    <div className="bg-gray-800/50 rounded-lg p-6">
+                      <h3 className="font-semibold mb-3">🎤 Vocal Track</h3>
+                      <Waveform />
+                      <div className="mt-4">
+                        <AudioPlayer src={vocalUrl || undefined} />
+                      </div>
                     </div>
-                  </div>
+                  )}
 
-                  {/* Track Channels */}
-                  <div className="grid grid-cols-4 gap-4">
-                    {['Vocals', 'Drums', 'Bass', 'Keys'].map((channel) => (
-                      <div key={channel} className="bg-gray-800/50 rounded-lg p-4">
-                        <h4 className="text-sm font-semibold mb-3 text-center">{channel}</h4>
+                  {/* Instrumental Track */}
+                  {instrumentalFile && (
+                    <div className="bg-gray-800/50 rounded-lg p-6">
+                      <h3 className="font-semibold mb-3">🎵 Instrumental Track</h3>
+                      <Waveform />
+                      <div className="mt-4">
+                        <AudioPlayer src={instrumentalUrl || undefined} />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Track Channels - Volume Controls */}
+                  {vocalFile && instrumentalFile && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-gray-800/50 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold mb-3 text-center">Vocal Volume</h4>
                         <div className="flex justify-center mb-2">
                           <input 
                             type="range" 
@@ -121,24 +240,34 @@ export default function MixingPage() {
                             style={{ writingMode: 'bt-lr', appearance: 'slider-vertical' }}
                           />
                         </div>
-                        <div className="flex gap-2 mt-3">
-                          <button className="flex-1 bg-gray-700 hover:bg-gray-600 text-xs py-1 rounded">M</button>
-                          <button className="flex-1 bg-gray-700 hover:bg-gray-600 text-xs py-1 rounded">S</button>
+                      </div>
+                      <div className="bg-gray-800/50 rounded-lg p-4">
+                        <h4 className="text-sm font-semibold mb-3 text-center">Instrumental Volume</h4>
+                        <div className="flex justify-center mb-2">
+                          <input 
+                            type="range" 
+                            orient="vertical" 
+                            className="h-32 accent-purple-600"
+                            style={{ writingMode: 'bt-lr', appearance: 'slider-vertical' }}
+                          />
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    </div>
+                  )}
 
                   {/* Mixed Result */}
-                  {hasMixed && (
+                  {hasMixed && mixedAudioUrl && (
                     <div className="bg-gray-800/50 rounded-lg p-6 border border-purple-600/50">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="font-semibold">AI Mixed Track</h3>
-                        <button className="btn-secondary text-sm">Download</button>
+                        <div>
+                          <h3 className="font-semibold">🎵 Full Song Mix</h3>
+                          <p className="text-sm text-green-400 mt-1">✓ Successfully mixed</p>
+                        </div>
+                        <button onClick={handleDownload} className="btn-secondary text-sm">📥 Download</button>
                       </div>
                       <Waveform />
                       <div className="mt-4">
-                        <AudioPlayer />
+                        <AudioPlayer src={mixedAudioUrl} />
                       </div>
                     </div>
                   )}
@@ -147,12 +276,16 @@ export default function MixingPage() {
                   <div className="flex gap-4">
                     <button 
                       onClick={handleMix}
-                      disabled={isMixing}
+                      disabled={isMixing || !vocalFile || !instrumentalFile}
                       className="btn-primary flex-1 disabled:opacity-50"
                     >
-                      {isMixing ? '🎚️ Mixing...' : '✨ AI Auto Mix'}
+                      {isMixing ? '🎚️ Mixing...' : '✨ Mix Tracks'}
                     </button>
-                    {hasMixed && <button className="btn-secondary flex-1">Save Project</button>}
+                    {hasMixed && (
+                      <button onClick={handleReset} className="btn-secondary flex-1">
+                        🔄 New Mix
+                      </button>
+                    )}
                   </div>
                 </div>
               )}

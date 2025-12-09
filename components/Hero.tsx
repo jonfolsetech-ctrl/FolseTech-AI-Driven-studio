@@ -8,7 +8,7 @@ export default function Hero() {
       <div className='absolute inset-0 bg-[radial-gradient(circle_at_50%_50%,rgba(120,0,255,0.1),transparent_50%)]'></div>
       
       <div className='relative z-10 text-center max-w-5xl mx-auto px-4'>
-        <h1 className='text-6xl md:text-8xl font-bold mb-6 bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 text-transparent bg-clip-text'>
+        <h1 className='text-6xl md:text-8xl font-bold mb-6 text-black drop-shadow-[0_4px_8px_rgba(0,0,0,0.8)] [text-shadow:0_0_30px_rgba(147,51,234,0.8),0_0_60px_rgba(147,51,234,0.6),0_0_90px_rgba(147,51,234,0.4)]'>
           FolseTech Pro AI Studio
         </h1>
         <p className='text-xl md:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto'>
