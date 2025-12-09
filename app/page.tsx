@@ -22,8 +22,14 @@ export default function Home() {
     <main>
       {/* Announcement Modal */}
       {showAnnouncement && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-gradient-to-br from-purple-900/90 to-black border-2 border-purple-500 rounded-2xl max-w-2xl w-full p-8 relative animate-fade-in">
+        <div 
+          className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={handleCloseAnnouncement}
+        >
+          <div 
+            className="bg-gradient-to-br from-purple-900/90 to-black border-2 border-purple-500 rounded-2xl max-w-2xl w-full p-8 relative animate-fade-in"
+            onClick={(e) => e.stopPropagation()}
+          >
             {/* Close Button */}
             <button
               onClick={handleCloseAnnouncement}
