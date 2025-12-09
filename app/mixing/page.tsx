@@ -235,9 +235,7 @@ export default function MixingPage() {
                         <div className="flex justify-center mb-2">
                           <input 
                             type="range" 
-                            orient="vertical" 
                             className="h-32 accent-purple-600"
-                            style={{ writingMode: 'bt-lr', appearance: 'slider-vertical' }}
                           />
                         </div>
                       </div>
@@ -246,9 +244,7 @@ export default function MixingPage() {
                         <div className="flex justify-center mb-2">
                           <input 
                             type="range" 
-                            orient="vertical" 
                             className="h-32 accent-purple-600"
-                            style={{ writingMode: 'bt-lr', appearance: 'slider-vertical' }}
                           />
                         </div>
                       </div>
