@@ -5,6 +5,8 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData()
     const vocalFile = formData.get('vocals') as File
     const instrumentalFile = formData.get('instrumental') as File
+    const vocalVolume = parseFloat(formData.get('vocalVolume') as string) || 1.0
+    const instrumentalVolume = parseFloat(formData.get('instrumentalVolume') as string) || 1.0
 
     if (!vocalFile || !instrumentalFile) {
       return NextResponse.json(
@@ -17,44 +19,37 @@ export async function POST(req: NextRequest) {
       vocalSize: vocalFile.size,
       vocalType: vocalFile.type,
       instrumentalSize: instrumentalFile.size,
-      instrumentalType: instrumentalFile.type
+      instrumentalType: instrumentalFile.type,
+      vocalVolume,
+      instrumentalVolume
     })
 
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000))
-
-    /*
-     * TO ADD REAL AUDIO MIXING:
-     * 
-     * Option 1: Use FFmpeg (via fluent-ffmpeg or @ffmpeg/ffmpeg)
-     * - npm install fluent-ffmpeg
-     * - Combine audio tracks with volume control
-     * - Example:
-     *   ffmpeg()
-     *     .input(vocalPath)
-     *     .input(instrumentalPath)
-     *     .complexFilter(['[0:a][1:a]amix=inputs=2:duration=longest'])
-     *     .save(outputPath)
-     * 
-     * Option 2: Cloud Audio Processing Services
-     * - Dolby.io API for professional mixing
-     * - AWS Elemental for audio processing
-     * 
-     * Option 3: Web Audio API (client-side)
-     * - Process mixing in the browser
-     * - Combine audio buffers
-     * 
-     * For now, we'll return the vocal track as a placeholder
-     */
-
-    // Return one of the tracks as placeholder
-    const audioBuffer = await vocalFile.arrayBuffer()
+    // For now, we'll return both files information so the client can mix them
+    // In a production environment, you would use FFmpeg on the server or a cloud service
     
-    return new NextResponse(audioBuffer, {
+    // Get both audio buffers
+    const vocalBuffer = await vocalFile.arrayBuffer()
+    const instrumentalBuffer = await instrumentalFile.arrayBuffer()
+
+    // Create a response that includes both audio files
+    // We'll return the instrumental for now since the mixing will happen client-side
+    const response = {
+      message: 'Client-side mixing required',
+      vocalSize: vocalBuffer.byteLength,
+      instrumentalSize: instrumentalBuffer.byteLength
+    }
+
+    // Return the larger file as base (usually instrumental)
+    const baseBuffer = instrumentalBuffer.byteLength > vocalBuffer.byteLength 
+      ? instrumentalBuffer 
+      : vocalBuffer
+
+    return new NextResponse(baseBuffer, {
       status: 200,
       headers: {
         'Content-Type': 'audio/mpeg',
         'Content-Disposition': 'attachment; filename="mixed-song.mp3"',
+        'X-Mixing-Note': 'Server mixing not available, using base track',
       },
     })
   } catch (error) {

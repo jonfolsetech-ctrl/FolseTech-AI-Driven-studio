@@ -11,14 +11,61 @@ export default function BeatGeneratorPage() {
   const [stylePrompt, setStylePrompt] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
   const [hasGenerated, setHasGenerated] = useState(false)
+  const [generatedBeat, setGeneratedBeat] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleGenerate = async () => {
+    if (!genre || !bpm || !mood) {
+      alert('Please fill in all required fields')
+      return
+    }
+
     setIsGenerating(true)
-    // Simulate API call
-    setTimeout(() => {
+    setGeneratedBeat(null)
+    setError(null)
+
+    try {
+      console.log('Generating beat with params:', { genre, bpm, mood, stylePrompt })
+      
+      const response = await fetch('/api/beats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          genre,
+          bpm,
+          mood,
+          stylePrompt,
+          duration: 30,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || data.details || 'Beat generation failed')
+      }
+
+      if (data.audioUrl) {
+        setGeneratedBeat(data.audioUrl)
+        setHasGenerated(true)
+        console.log('Beat generated successfully:', data.metadata)
+      } else {
+        console.log('Mock generation mode (no audio URL)')
+        const mockUrl = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQAAAAA='
+        setGeneratedBeat(mockUrl)
+        setHasGenerated(true)
+      }
+      
+    } catch (error) {
+      console.error('Beat generation failed:', error)
+      const errorMsg = error instanceof Error ? error.message : String(error)
+      setError(errorMsg)
+      alert(`Failed to generate beat: ${errorMsg}`)
+    } finally {
       setIsGenerating(false)
-      setHasGenerated(true)
-    }, 2000)
+    }
   }
 
   return (
@@ -116,6 +163,12 @@ export default function BeatGeneratorPage() {
             <div className="card">
               <h2 className="text-2xl font-bold mb-6">Generated Beat</h2>
               
+              {error && (
+                <div className="bg-red-900/20 border border-red-500 rounded-lg p-4 mb-4">
+                  <p className="text-red-400">⚠️ {error}</p>
+                </div>
+              )}
+              
               {!hasGenerated ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center">
                   <div className="text-6xl mb-4">🎵</div>
@@ -126,7 +179,7 @@ export default function BeatGeneratorPage() {
                   <div className="bg-gray-800/50 rounded-lg p-6">
                     <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h3 className="text-xl font-semibold">Beat_001.wav</h3>
+                        <h3 className="text-xl font-semibold">Beat_{Date.now()}.wav</h3>
                         <p className="text-sm text-gray-400">{genre} • {bpm} BPM • {mood}</p>
                         {stylePrompt && (
                           <p className="text-xs text-purple-400 mt-1">
@@ -135,12 +188,24 @@ export default function BeatGeneratorPage() {
                           </p>
                         )}
                       </div>
-                      <button className="btn-secondary text-sm">Download</button>
+                      {generatedBeat && (
+                        <a 
+                          href={generatedBeat} 
+                          download={`Beat_${Date.now()}.wav`}
+                          className="btn-secondary text-sm"
+                        >
+                          Download
+                        </a>
+                      )}
                     </div>
-                    <Waveform />
-                    <div className="mt-4">
-                      <AudioPlayer />
-                    </div>
+                    {generatedBeat && (
+                      <>
+                        <Waveform />
+                        <div className="mt-4">
+                          <AudioPlayer src={generatedBeat} />
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   <div className="flex gap-4">

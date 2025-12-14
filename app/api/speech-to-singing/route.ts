@@ -1,4 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { 
+  convertSpeechToSinging, 
+  validateAudioParams, 
+  preprocessLyrics 
+} from '@/lib/diffsvs'
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,77 +23,89 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    console.log('Processing with settings:', {
+    // Convert the audio file to a buffer
+    const audioBuffer = await audioFile.arrayBuffer()
+
+    // Prepare conversion parameters
+    const conversionParams = {
+      audioBuffer,
+      voiceType,
+      pitchShift: parseInt(pitchShift) || 0,
+      key,
+      style,
+      autoTune: parseInt(autoTune) || 50,
+      lyrics,
+    }
+
+    // Validate parameters
+    const validation = validateAudioParams(conversionParams)
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: validation.errors.join(', ') },
+        { status: 400 }
+      )
+    }
+
+    // Process lyrics if provided
+    let lyricsInfo = null
+    if (lyrics) {
+      lyricsInfo = preprocessLyrics(lyrics)
+    }
+
+    console.log('DiffSVS Processing with settings:', {
       voiceType,
       pitchShift,
       key,
       style,
       autoTune,
       lyrics: lyrics ? `${lyrics.substring(0, 50)}...` : 'none',
-      lyricsLength: lyrics?.length || 0,
+      lyricsInfo,
+      fileSize: audioFile.size,
+      fileType: audioFile.type
+    })
+    console.log('DiffSVS Processing with settings:', {
+      voiceType,
+      pitchShift,
+      key,
+      style,
+      autoTune,
+      lyrics: lyrics ? `${lyrics.substring(0, 50)}...` : 'none',
+      lyricsInfo,
       fileSize: audioFile.size,
       fileType: audioFile.type
     })
 
-    // Simulate processing time
-    await new Promise(resolve => setTimeout(resolve, 2000))
+    // Convert speech to singing using DiffSVS integration
+    const result = await convertSpeechToSinging(conversionParams)
 
-    // Convert the audio file to a buffer
-    const audioBuffer = await audioFile.arrayBuffer()
+    // Handle the result
+    let responseBuffer: ArrayBuffer
+    let contentType = 'audio/webm'
+
+    if (result.audioBuffer) {
+      // Direct buffer response (from custom DiffSVS or mock)
+      responseBuffer = result.audioBuffer
+    } else if (result.audioUrl) {
+      // Fetch from URL (from Replicate or other services)
+      const audioResponse = await fetch(result.audioUrl)
+      responseBuffer = await audioResponse.arrayBuffer()
+      contentType = audioResponse.headers.get('content-type') || 'audio/mp3'
+    } else {
+      throw new Error('No audio output received from conversion')
+    }
+
+    console.log('Conversion successful:', {
+      outputSize: responseBuffer.byteLength,
+      contentType,
+    })
     
-    /* 
-     * TO ADD REAL AI SPEECH-TO-SINGING CONVERSION WITH LYRICS:
-     * 
-     * The lyrics parameter helps guide the AI to sing the specific words.
-     * Your voice recording provides the voice characteristics.
-     * 
-     * Option 1: Replicate API (https://replicate.com)
-     * - Sign up and get API token
-     * - Use models like: "so-vits-svc" or "bark" for singing voice conversion
-     * - Example:
-     *   const response = await fetch('https://api.replicate.com/v1/predictions', {
-     *     method: 'POST',
-     *     headers: {
-     *       'Authorization': `Token ${process.env.REPLICATE_API_TOKEN}`,
-     *       'Content-Type': 'application/json',
-     *     },
-     *     body: JSON.stringify({
-     *       version: "model-version-here",
-     *       input: { 
-     *         audio: base64Audio, 
-     *         pitch_shift: pitchShift,
-     *         lyrics: lyrics,  // Use lyrics to guide singing
-     *         style: style,
-     *         key: key
-     *       }
-     *     })
-     *   })
-     * 
-     * Option 2: Suno AI or similar text-to-music services
-     * - Combine your voice characteristics with lyrics
-     * - Generate singing based on voice sample + lyrics
-     * 
-     * Option 3: Custom Model
-     * - Host your own SoVITS, RVC, or Diff-SVC model
-     * - Process: Extract voice features → Apply to lyrics → Generate singing
-     * 
-     * Option 4: ElevenLabs Voice Design
-     * - Clone voice from sample
-     * - Generate speech with singing intonation
-     * 
-     * Add your API key to .env.local:
-     * REPLICATE_API_TOKEN=your_token_here
-     * ELEVENLABS_API_KEY=your_key_here
-     * SUNO_API_KEY=your_key_here
-     */
-    
-    // For now, return the original audio as a placeholder
-    // This simulates the conversion process
-    return new NextResponse(audioBuffer, {
+    // Return the converted audio
+    return new NextResponse(responseBuffer, {
       status: 200,
       headers: {
-        'Content-Type': audioFile.type,
+        'Content-Type': contentType,
         'Content-Disposition': 'attachment; filename="singing-output.webm"',
+        'X-Conversion-Method': result.audioUrl ? 'remote' : 'local',
       },
     })
   } catch (error) {

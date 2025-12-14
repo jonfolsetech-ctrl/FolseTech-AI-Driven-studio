@@ -12,6 +12,12 @@ export default function SpeechToSingingPage() {
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
   const [recordedAudioUrl, setRecordedAudioUrl] = useState<string | null>(null)
   const [resultAudioUrl, setResultAudioUrl] = useState<string | null>(null)
+  const [instrumentalBlob, setInstrumentalBlob] = useState<Blob | null>(null)
+  const [instrumentalUrl, setInstrumentalUrl] = useState<string | null>(null)
+  const [isMixing, setIsMixing] = useState(false)
+  const [mixedAudioUrl, setMixedAudioUrl] = useState<string | null>(null)
+  const [vocalVolume, setVocalVolume] = useState(100)
+  const [instrumentalVolume, setInstrumentalVolume] = useState(80)
   const [error, setError] = useState<string | null>(null)
   const [voiceType, setVoiceType] = useState('Male')
   const [pitchShift, setPitchShift] = useState(0)
@@ -169,6 +175,255 @@ export default function SpeechToSingingPage() {
       }
     } catch (err) {
       setError('Failed to download audio')
+      console.error('Download error:', err)
+    }
+  }
+
+  const handleInstrumentalUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (file) {
+      const url = URL.createObjectURL(file)
+      setInstrumentalBlob(file)
+      setInstrumentalUrl(url)
+      setError(null)
+    }
+  }
+
+  const handleMixTracks = async () => {
+    if (!resultAudioUrl || !instrumentalBlob) {
+      setError('Need both singing voice and instrumental track')
+      return
+    }
+
+    setIsMixing(true)
+    setError(null)
+
+    try {
+      // Get the singing voice as a blob
+      let vocalBlob: Blob
+      if (resultAudioUrl.startsWith('blob:')) {
+        const response = await fetch(resultAudioUrl)
+        vocalBlob = await response.blob()
+      } else {
+        const response = await fetch(resultAudioUrl)
+        vocalBlob = await response.blob()
+      }
+
+      console.log('Starting audio mixing...', {
+        vocalSize: vocalBlob.size,
+        vocalType: vocalBlob.type,
+        instrumentalSize: instrumentalBlob.size,
+        instrumentalType: instrumentalBlob.type,
+        vocalVolume,
+        instrumentalVolume
+      })
+
+      // Check if audio context is supported
+      if (!window.AudioContext && !(window as any).webkitAudioContext) {
+        throw new Error('Web Audio API is not supported in this browser')
+      }
+
+      // Create audio context for mixing
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+
+      // Load both audio files
+      console.log('Loading audio files...')
+      const [vocalArrayBuffer, instrumentalArrayBuffer] = await Promise.all([
+        vocalBlob.arrayBuffer(),
+        instrumentalBlob.arrayBuffer()
+      ])
+
+      // Decode audio data with error handling
+      console.log('Decoding audio data...')
+      let vocalAudioBuffer: AudioBuffer
+      let instrumentalAudioBuffer: AudioBuffer
+      
+      try {
+        vocalAudioBuffer = await audioContext.decodeAudioData(vocalArrayBuffer.slice(0))
+      } catch (decodeError) {
+        console.error('Vocal decode error:', decodeError)
+        throw new Error('Failed to decode vocal track. Make sure it\'s a valid audio file.')
+      }
+
+      try {
+        instrumentalAudioBuffer = await audioContext.decodeAudioData(instrumentalArrayBuffer.slice(0))
+      } catch (decodeError) {
+        console.error('Instrumental decode error:', decodeError)
+        throw new Error('Failed to decode instrumental track. Make sure it\'s a valid audio file.')
+      }
+
+      console.log('Audio decoded successfully:', {
+        vocalDuration: vocalAudioBuffer.duration.toFixed(2) + 's',
+        instrumentalDuration: instrumentalAudioBuffer.duration.toFixed(2) + 's',
+        vocalChannels: vocalAudioBuffer.numberOfChannels,
+        instrumentalChannels: instrumentalAudioBuffer.numberOfChannels,
+        sampleRate: audioContext.sampleRate
+      })
+
+      // Determine the length of the mixed audio (use the longer duration)
+      const duration = Math.max(vocalAudioBuffer.duration, instrumentalAudioBuffer.duration)
+      const length = Math.ceil(duration * audioContext.sampleRate)
+      const numberOfChannels = 2 // Stereo output
+
+      console.log('Creating offline context for mixing...')
+
+      // Create offline audio context for mixing
+      const offlineContext = new OfflineAudioContext(
+        numberOfChannels,
+        length,
+        audioContext.sampleRate
+      )
+
+      // Create sources for both tracks
+      const vocalSource = offlineContext.createBufferSource()
+      const instrumentalSource = offlineContext.createBufferSource()
+      
+      vocalSource.buffer = vocalAudioBuffer
+      instrumentalSource.buffer = instrumentalAudioBuffer
+
+      // Create gain nodes for volume control
+      const vocalGain = offlineContext.createGain()
+      const instrumentalGain = offlineContext.createGain()
+      
+      vocalGain.gain.value = vocalVolume / 100
+      instrumentalGain.gain.value = instrumentalVolume / 100
+
+      console.log('Volume settings:', {
+        vocal: vocalGain.gain.value,
+        instrumental: instrumentalGain.gain.value
+      })
+
+      // Connect the audio graph
+      vocalSource.connect(vocalGain)
+      instrumentalSource.connect(instrumentalGain)
+      vocalGain.connect(offlineContext.destination)
+      instrumentalGain.connect(offlineContext.destination)
+
+      // Start playback
+      vocalSource.start(0)
+      instrumentalSource.start(0)
+
+      console.log('Rendering mixed audio...')
+      // Render the mixed audio
+      const mixedBuffer = await offlineContext.startRendering()
+      
+      console.log('Mixing complete! Converting to WAV...')
+
+      // Convert to WAV blob
+      const wavBlob = audioBufferToWav(mixedBuffer)
+      const mixedUrl = URL.createObjectURL(wavBlob)
+      
+      setMixedAudioUrl(mixedUrl)
+      console.log('✓ Mixed audio ready! Size:', (wavBlob.size / 1024 / 1024).toFixed(2), 'MB')
+      
+      // Close audio context to free resources
+      await audioContext.close()
+      
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error'
+      setError(`Mixing failed: ${errorMessage}`)
+      console.error('Mixing error:', err)
+    } finally {
+      setIsMixing(false)
+    }
+  }
+
+  // Helper function to convert AudioBuffer to WAV blob
+  const audioBufferToWav = (buffer: AudioBuffer): Blob => {
+    const length = buffer.length * buffer.numberOfChannels * 2 + 44
+    const arrayBuffer = new ArrayBuffer(length)
+    const view = new DataView(arrayBuffer)
+    const channels = []
+    let offset = 0
+    let pos = 0
+
+    // Write WAV header
+    const setUint16 = (data: number) => {
+      view.setUint16(pos, data, true)
+      pos += 2
+    }
+
+    const setUint32 = (data: number) => {
+      view.setUint32(pos, data, true)
+      pos += 4
+    }
+
+    // RIFF identifier
+    setUint32(0x46464952)
+    // file length
+    setUint32(length - 8)
+    // RIFF type
+    setUint32(0x45564157)
+    // format chunk identifier
+    setUint32(0x20746d66)
+    // format chunk length
+    setUint32(16)
+    // sample format (raw)
+    setUint16(1)
+    // channel count
+    setUint16(buffer.numberOfChannels)
+    // sample rate
+    setUint32(buffer.sampleRate)
+    // byte rate (sample rate * block align)
+    setUint32(buffer.sampleRate * buffer.numberOfChannels * 2)
+    // block align (channel count * bytes per sample)
+    setUint16(buffer.numberOfChannels * 2)
+    // bits per sample
+    setUint16(16)
+    // data chunk identifier
+    setUint32(0x61746164)
+    // data chunk length
+    setUint32(length - pos - 4)
+
+    // Write interleaved data
+    for (let i = 0; i < buffer.numberOfChannels; i++) {
+      channels.push(buffer.getChannelData(i))
+    }
+
+    while (pos < length) {
+      for (let i = 0; i < buffer.numberOfChannels; i++) {
+        let sample = channels[i][offset]
+        sample = Math.max(-1, Math.min(1, sample))
+        view.setInt16(pos, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true)
+        pos += 2
+      }
+      offset++
+    }
+
+    return new Blob([arrayBuffer], { type: 'audio/wav' })
+  }
+
+  const handleDownloadMixed = async () => {
+    if (!mixedAudioUrl) return
+
+    try {
+      const link = document.createElement('a')
+      link.href = mixedAudioUrl
+      link.download = `mixed-song-${Date.now()}.wav`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+    } catch (err) {
+      setError('Failed to download mixed audio')
+      console.error('Download error:', err)
+    }
+  }
+
+  const handleDownloadLyrics = () => {
+    if (!lyrics) return
+
+    try {
+      const blob = new Blob([lyrics], { type: 'text/plain' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `lyrics-${Date.now()}.txt`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      URL.revokeObjectURL(url)
+    } catch (err) {
+      setError('Failed to download lyrics')
       console.error('Download error:', err)
     }
   }
@@ -379,6 +634,160 @@ export default function SpeechToSingingPage() {
                     <button onClick={handleReset} className="btn-secondary flex-1">
                       New Recording
                     </button>
+                  </div>
+                )}
+
+                {/* Mix with Instrumental */}
+                {hasConverted && (
+                  <div className="bg-gradient-to-r from-purple-900/20 to-blue-900/20 border border-purple-600/50 rounded-lg p-6 mt-6">
+                    <h3 className="text-2xl font-bold mb-4 flex items-center gap-2">
+                      🎹 Mix with Instrumental
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4">
+                      Upload an MP3 backing track to create your full song
+                    </p>
+
+                    {/* Lyrics Display/Edit for Mixing */}
+                    {lyrics && (
+                      <div className="bg-gray-800/50 rounded-lg p-4 mb-4">
+                        <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+                          📝 Song Lyrics
+                        </h4>
+                        <div className="bg-black/30 rounded p-3 max-h-40 overflow-y-auto">
+                          <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono">{lyrics}</pre>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const newLyrics = prompt('Edit your lyrics:', lyrics)
+                            if (newLyrics !== null) setLyrics(newLyrics)
+                          }}
+                          className="btn-secondary text-xs mt-2"
+                        >
+                          ✏️ Edit Lyrics
+                        </button>
+                      </div>
+                    )}
+
+                    {!lyrics && (
+                      <div className="bg-yellow-900/20 border border-yellow-600/50 rounded-lg p-3 mb-4">
+                        <p className="text-sm text-yellow-400 flex items-center gap-2">
+                          💡 <span>No lyrics added. Add lyrics to show them with your mixed song!</span>
+                        </p>
+                        <button 
+                          onClick={() => {
+                            const newLyrics = prompt('Add your song lyrics:')
+                            if (newLyrics) setLyrics(newLyrics)
+                          }}
+                          className="btn-secondary text-xs mt-2"
+                        >
+                          ➕ Add Lyrics
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Upload Instrumental */}
+                    {!instrumentalUrl ? (
+                      <div className="text-center py-6">
+                        <input 
+                          type="file" 
+                          accept="audio/*" 
+                          onChange={handleInstrumentalUpload}
+                          className="hidden" 
+                          id="instrumental-upload" 
+                        />
+                        <label htmlFor="instrumental-upload" className="btn-primary inline-block cursor-pointer">
+                          📁 Upload Instrumental/Backing Track
+                        </label>
+                        <p className="text-xs text-gray-500 mt-2">MP3, WAV, or any audio format</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {/* Instrumental Preview */}
+                        <div className="bg-gray-800/50 rounded-lg p-4">
+                          <h4 className="text-sm font-semibold mb-2">Instrumental Track</h4>
+                          <AudioPlayer src={instrumentalUrl} />
+                        </div>
+
+                        {/* Volume Controls */}
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-sm mb-2">Vocal Volume: {vocalVolume}%</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="150" 
+                              value={vocalVolume}
+                              onChange={(e) => setVocalVolume(parseInt(e.target.value))}
+                              className="w-full accent-purple-600" 
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-sm mb-2">Instrumental Volume: {instrumentalVolume}%</label>
+                            <input 
+                              type="range" 
+                              min="0" 
+                              max="150" 
+                              value={instrumentalVolume}
+                              onChange={(e) => setInstrumentalVolume(parseInt(e.target.value))}
+                              className="w-full accent-blue-600" 
+                            />
+                          </div>
+                        </div>
+
+                        {/* Mix Button */}
+                        <button 
+                          onClick={handleMixTracks}
+                          disabled={isMixing}
+                          className="btn-primary w-full disabled:opacity-50"
+                        >
+                          {isMixing ? '🎚️ Mixing Tracks (This may take a few seconds)...' : '🎵 Mix Tracks Together'}
+                        </button>
+
+                        {isMixing && (
+                          <div className="text-center text-sm text-gray-400">
+                            <p>Processing audio... This may take 10-30 seconds depending on track length.</p>
+                            <p className="text-xs mt-1">Using Web Audio API for real-time mixing</p>
+                          </div>
+                        )}
+
+                        {/* Mixed Result */}
+                        {mixedAudioUrl && (
+                          <div className="bg-green-900/20 border border-green-600/50 rounded-lg p-4">
+                            <div className="flex items-center justify-between mb-3">
+                              <h4 className="text-lg font-semibold text-green-400">✓ Mixed Song Ready!</h4>
+                              <div className="flex gap-2">
+                                <button onClick={handleDownloadMixed} className="btn-primary text-sm">
+                                  📥 Download Song
+                                </button>
+                                {lyrics && (
+                                  <button onClick={handleDownloadLyrics} className="btn-secondary text-sm">
+                                    📄 Download Lyrics
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                            <AudioPlayer src={mixedAudioUrl} />
+                            {lyrics && (
+                              <div className="mt-3 text-xs text-gray-400">
+                                💡 Tip: Download both the song and lyrics to keep them together
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Change Instrumental */}
+                        <button 
+                          onClick={() => {
+                            setInstrumentalBlob(null)
+                            setInstrumentalUrl(null)
+                            setMixedAudioUrl(null)
+                          }}
+                          className="btn-secondary w-full text-sm"
+                        >
+                          Change Instrumental
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
